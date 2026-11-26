@@ -21,7 +21,7 @@ if clang.found()
         endif
     endif
 
-    vdso_compiler = [clang, '-target', 'aarch64-linux-gnu', '-fuse-ld=lld']
+    vdso_compiler = [clang, '-target', 'aarch64-linux-gnu']
 
     vdso = custom_target('vdso-arm64',
         input: ['vdso.S', 'vdso.c', 'vdso.lds'],
