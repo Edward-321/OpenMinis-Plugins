@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "output-style",
+  "name": "Output Style",
+  "version": "1.0.0",
+  "description": "Answer-shape rules: conclusion first, no filler, no summary paragraphs.",
+  "author": "OpenMinis",
+  "priority": 10,
+  "modules": [
+    { "id": "core", "name": "Conclusion first", "file": "prompts/core.md", "default": true },
+    { "id": "terse", "name": "Terse mode", "file": "prompts/terse.md", "default": false },
+    { "id": "code", "name": "Code delivery", "file": "prompts/code.md", "default": true }
+  ],
+  "profiles": {
+    "base": ["core", "code"],
+    "minimal": ["core"],
+    "full": ["*"]
+  }
+}
