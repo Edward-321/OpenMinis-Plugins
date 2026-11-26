@@ -1,0 +1,80 @@
+name: Parse Check
+
+# The full app build needs Xcode 26 + 30-60 min of native dependency builds
+# (iSH kernel, FFmpeg, rclone) before xcodebuild can resolve the project, and
+# macOS runners queue for a long time. This job is the cheap half and runs on
+# Linux: `swiftc -parse` is a pure syntax pass, no SDK or module resolution, so
+# it catches unbalanced braces, bad string literals and malformed signatures in
+# seconds. It cannot catch type errors — the xcodebuild job is what does that.
+on:
+  push:
+    paths:
+      - 'src/ios/**'
+      - '.github/workflows/parse-check.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swiftc --version
+
+      - name: Parse check
+        shell: bash
+        run: |
+          files="
+            src/ios/Agent/Session/PluginStore.swift
+            src/ios/Views/Settings/PluginsSettingsView.swift
+            src/ios/Views/Settings/SettingsSheet.swift
+            src/ios/Agent/Chat/AIChatViewModel+AgentLoop.swift
+          "
+          fail=0
+          for f in $files; do
+            echo "::group::$f"
+            if swiftc -parse "$f" 2>&1; then
+              echo "OK"
+            else
+              echo "::error file=$f::parse failed"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+      - name: Project file sanity
+        shell: bash
+        run: |
+          # The swift image has no python3; the check needs only the stdlib,
+          # so installing it beats porting the script to awk.
+          if ! command -v python3 >/dev/null; then
+            apt-get update -qq && apt-get install -y -qq python3 >/dev/null
+          fi
+          python3 .github/scripts/check_pbxproj.py
+
+  # Type-checking and linking need a real Xcode and the prebuilt native deps,
+  # so this job is manual: it is opt-in via workflow_dispatch, not on every
+  # push. See BUILDING.md for the dependency steps it assumes are cached.
+  xcodebuild:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Toolchain
+        run: xcodebuild -version
+      - name: Build (expect link failure without deps; Swift errors surface first)
+        run: |
+          xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
+            -configuration Debug -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build 2>&1 \
+            | tee build.log | grep -E "error:|warning: .*Plugin" || true
+          if grep -q "error:" build.log; then
+            echo "::error::compile errors present"
+            exit 1
+          fi

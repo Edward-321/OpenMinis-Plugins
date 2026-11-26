@@ -1,0 +1,44 @@
+name: Minis Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install ninja llvm libarchive pkg-config go meson
+
+      - name: Cache native deps
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/ish/build
+            deps/ffmpeg-patch/build
+            deps/rclone-mobile/build
+          key: ${{ runner.os }}-native-deps-${{ hashFiles('deps/build_*.sh') }}
+
+      - name: Build native dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          ./deps/build_ish.sh
+          ./deps/build_ffmpeg.sh
+          ./deps/build_rclone_ios.sh
+
+      - name: Build Minis
+        run: |
+          # 注入配置
+          cp src/ios/Configs/ProviderCustomization.xcconfig.example \
+             src/ios/Configs/ProviderCustomization.xcconfig || true
+          
+          xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
+            -configuration Debug -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
