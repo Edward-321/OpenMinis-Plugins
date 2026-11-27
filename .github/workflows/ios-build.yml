@@ -188,8 +188,8 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
-            -configuration "$CONFIGURATION" -sdk iphoneos \
-            -destination 'generic/platform=iOS' -arch arm64 \
+            -configuration "$CONFIGURATION" \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath "$PWD/build/DerivedData" \
             -clonedSourcePackagesDirPath "$PWD/build/DerivedData/SourcePackages" \
             -resultBundlePath "$PWD/build/diagnostics/Minis.xcresult" \
