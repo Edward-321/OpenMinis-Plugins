@@ -71,6 +71,7 @@ jobs:
           print('Selected',chosen)
           PY
           xcodebuild -version | tee build/diagnostics/xcode-version.txt
+          echo "XCODE_BUILD=$(shasum -a 256 build/diagnostics/xcode-version.txt | awk '{print $1}')" >> "$GITHUB_ENV"
           if ! xcrun --sdk iphoneos metal --version; then
             xcodebuild -downloadComponent MetalToolchain
           fi
@@ -92,7 +93,17 @@ jobs:
           go version | tee build/diagnostics/go-version.txt
           go env GOVERSION GOEXPERIMENT GOTOOLCHAIN | tee build/diagnostics/go-flags.txt
 
+      - name: Restore verified rclone build cache
+        id: rclone-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            deps/frameworks/Rclone.xcframework
+            deps/build/rclone
+          key: rclone-nojsonv2-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.XCODE_BUILD }}-${{ inputs.go_version || '1.27.4' }}-${{ hashFiles('deps/rclone-mobile/**', 'deps/build_rclone_ios.sh') }}
+
       - name: Verify JSON compatibility and build real Rclone XCFramework
+        if: steps.rclone-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           cd deps/rclone-mobile
@@ -107,9 +118,20 @@ jobs:
           git diff -- deps/rclone-mobile/go.mod deps/rclone-mobile/go.sum > build/diagnostics/rclone-lock.diff
           test -s deps/frameworks/Rclone.xcframework/Info.plist
 
+      - name: Save successful rclone build independently of later app failures
+        if: steps.rclone-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            deps/frameworks/Rclone.xcframework
+            deps/build/rclone
+          key: ${{ steps.rclone-cache.outputs.cache-primary-key }}
+
       - name: Build LAME before FFmpeg (retain MP3 support)
         run: |
           set -euo pipefail
+          # Vendored upload lost executable modes; restore only audited build helpers.
+          chmod +x deps/lame-3.100/configure deps/lame-3.100/config.guess deps/lame-3.100/config.sub
           bash deps/build_lame.sh
           test -s deps/lame-build/lib/libmp3lame.a
           bash deps/build_ffmpeg.sh

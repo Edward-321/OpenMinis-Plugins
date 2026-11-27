@@ -590,6 +590,7 @@
 		F1M00020 /* MessageImageGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1M00019 /* MessageImageGallery.swift */; };
 		F1MCPDCRB /* MCPOAuthDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1MCPDCR /* MCPOAuthDiscovery.swift */; };
 		F1MCPOAUTHB /* MCPOAuthController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1MCPOAUTH /* MCPOAuthController.swift */; };
+		F1MCPSTOREB /* MCPStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1MCPSTORE /* MCPStore.swift */; };
 		F1VPLUGB01 /* PluginStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1VPLUGF01 /* PluginStore.swift */; };
 		F1VPLUGB02 /* PluginsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1VPLUGF02 /* PluginsSettingsView.swift */; };
 		F1S00012 /* ChatSessionIdEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1S00011 /* ChatSessionIdEnvironment.swift */; };
@@ -1414,6 +1415,7 @@
 		F1M00019 /* MessageImageGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageImageGallery.swift; sourceTree = "<group>"; };
 		F1MCPDCR /* MCPOAuthDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPOAuthDiscovery.swift; sourceTree = "<group>"; };
 		F1MCPOAUTH /* MCPOAuthController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPOAuthController.swift; sourceTree = "<group>"; };
+		F1MCPSTORE /* MCPStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPStore.swift; sourceTree = "<group>"; };
 		F1VPLUGF01 /* PluginStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginStore.swift; sourceTree = "<group>"; };
 		F1VPLUGF02 /* PluginsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginsSettingsView.swift; sourceTree = "<group>"; };
 		F1S00011 /* ChatSessionIdEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionIdEnvironment.swift; sourceTree = "<group>"; };
@@ -2460,6 +2462,7 @@
 				E5S000013 /* SessionForkManager.swift */,
 				E5LOCK101 /* SessionLockStore.swift */,
 				E5N0000112F3B941A00049557 /* SkillStore.swift */,
+				F1MCPSTORE /* MCPStore.swift */,
 				F1VPLUGF01 /* PluginStore.swift */,
 				F1MCPOAUTH /* MCPOAuthController.swift */,
 				F1MCPDCR /* MCPOAuthDiscovery.swift */,
@@ -2595,6 +2598,7 @@
 		F1V00011 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AA0838A12F3B941A00049557 /* AboutView.swift */,
 				F1VPLUGF02 /* PluginsSettingsView.swift */,
 				E5S000014 /* CloudSyncSettingsView.swift */,
 				E5G000013 /* EnhancedBackgroundSettingsView.swift */,
@@ -3480,6 +3484,7 @@
 				E5X000001 /* SwiftMathRenderer.swift in Sources */,
 				E5Y000001 /* MathRenderScheduler.swift in Sources */,
 				E5N0000012F3B941A00049557 /* SkillStore.swift in Sources */,
+				F1MCPSTOREB /* MCPStore.swift in Sources */,
 				F1VPLUGB01 /* PluginStore.swift in Sources */,
 				F1MCPOAUTHB /* MCPOAuthController.swift in Sources */,
 				F1MCPDCRB /* MCPOAuthDiscovery.swift in Sources */,
@@ -3488,6 +3493,7 @@
 				F1CPCONSTB /* CopilotConstants.swift in Sources */,
 				F1CPSHEETB /* CopilotDeviceLoginSheet.swift in Sources */,
 				E5N0000022F3B941A00049557 /* SessionSkillsView.swift in Sources */,
+				E5N0000032F3B941A00049557 /* SkillsManagementView.swift in Sources */,
 				F1VPLUGB02 /* PluginsSettingsView.swift in Sources */,
 				F1VMCPB1 /* MCPIntegrationsView.swift in Sources */,
 				F1VMCPB2 /* MCPFormSheet.swift in Sources */,
