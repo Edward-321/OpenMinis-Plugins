@@ -116,6 +116,10 @@ jobs:
           cd ../..
           bash deps/build_rclone_ios.sh
           git diff -- deps/rclone-mobile/go.mod deps/rclone-mobile/go.sum > build/diagnostics/rclone-lock.diff
+          if [ -s build/diagnostics/rclone-lock.diff ]; then
+            echo '::error::Go dependency lock files changed; review the recorded diff'
+            exit 1
+          fi
           test -s deps/frameworks/Rclone.xcframework/Info.plist
 
       - name: Save successful rclone build independently of later app failures

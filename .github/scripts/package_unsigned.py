@@ -37,10 +37,18 @@ for b in bundles:
 ipa=dist/'Minis-unsigned.ipa'
 with tempfile.TemporaryDirectory(prefix='minis-ipa-') as td:
     payload=pathlib.Path(td)/'Payload';payload.mkdir()
-    shutil.copytree(app,payload/'Minis.app',symlinks=True)
+    copied=payload/'Minis.app'
+    shutil.copytree(app,copied,symlinks=True)
+    # Clean only the temporary packaging copy, never Xcode build products.
+    for residual in list(copied.rglob('_CodeSignature'))+list(copied.rglob('embedded.mobileprovision')):
+        if residual.is_dir() and not residual.is_symlink():shutil.rmtree(residual)
+        else:residual.unlink()
+    assert not list(copied.rglob('_CodeSignature'))
+    assert not list(copied.rglob('embedded.mobileprovision'))
     subprocess.run(['ditto','-c','-k','--norsrc','--keepParent','Payload',str(ipa)],cwd=td,check=True)
 with zipfile.ZipFile(ipa) as z:
     assert z.testzip() is None,'IPA ZIP checksum failure'
+    assert not any('_CodeSignature' in pathlib.PurePosixPath(n).parts or pathlib.PurePosixPath(n).name=='embedded.mobileprovision' for n in z.namelist()),'Signing residue in packaged IPA'
     assert 'Payload/Minis.app/Info.plist' in z.namelist()
     assert 'Payload/Minis.app/alpine-rootfs.zip' in z.namelist()
 sha=hashlib.sha256(ipa.read_bytes()).hexdigest()
