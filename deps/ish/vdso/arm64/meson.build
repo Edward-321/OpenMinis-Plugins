@@ -10,7 +10,7 @@
 # Try to find an aarch64 compiler
 clang = find_program('/usr/local/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/clang', '/opt/local/bin/clang', 'clang', required: false)
 
-if clang.found()
+if false and clang.found()
     # Check if the compiler supports aarch64 target
     check_cc = find_program('./check-cc-arm64.sh', required: false)
     if check_cc.found()
@@ -21,7 +21,7 @@ if clang.found()
         endif
     endif
 
-    vdso_compiler = [clang, '-target', 'aarch64-linux-gnu']
+    vdso_compiler = [clang, '-target', 'aarch64-linux-gnu', '-fuse-ld=lld']
 
     vdso = custom_target('vdso-arm64',
         input: ['vdso.S', 'vdso.c', 'vdso.lds'],
