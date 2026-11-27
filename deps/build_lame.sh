@@ -105,6 +105,9 @@ export LDFLAGS="-arch arm64 $MIN_FLAG -isysroot $IOS_SDK"
 
 cd "$SOURCE_DIR"
 
+# Vendored source uploads can lose execute bits on Autotools helpers.
+chmod +x configure config.guess config.sub install-sh missing depcomp
+
 ./configure \
     --prefix="$LAME_BUILD_DIR" \
     --host=aarch64-apple-darwin \
@@ -115,7 +118,9 @@ cd "$SOURCE_DIR"
     --disable-gtktest \
     --with-pic
 
-log_info "Building LAME..."
+log_info "Building LAME from clean source objects..."
+# Never reuse uploaded objects from another SDK, platform or architecture.
+make clean
 make -j$(sysctl -n hw.ncpu)
 make install
 
