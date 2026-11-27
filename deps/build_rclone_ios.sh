@@ -14,7 +14,7 @@ mkdir -p "$BUILD" "$OUT"
 cd "$SRC"
 
 # Pin Go dependency to fix build failure
-go get github.com/go-json-experiment/json@v0.0.0-20240901000000-000000000000
+go get github.com/go-json-experiment/json@v0.0.0-20231103231146-083d372dc545
 go mod tidy
 
 build_slice() {
