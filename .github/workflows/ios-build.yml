@@ -1,45 +1,201 @@
 name: Minis Build
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      go_version:
+        description: Explicit Go toolchain (no automatic Homebrew upgrades)
+        type: choice
+        options: ['1.27.4', '1.26.11', '1.25.5']
+        default: '1.27.4'
+
+permissions:
+  contents: read
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CONFIGURATION: Release
+  GOEXPERIMENT: nojsonv2
+  GOTOOLCHAIN: local
+  GOENV: 'off'
+  GO_TAGS: ts_omit_logtail,ts_omit_portmapper
 
 jobs:
   build:
     runs-on: macos-15
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout custom plugin project
+        uses: actions/checkout@v4
         with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Checkout matching complete public source and exact submodules
+        uses: actions/checkout@v4
+        with:
+          repository: OpenMinis/OpenMinis
+          ref: f74bca69aaf028209a80435e8c805cb5db21bfa9
+          path: .upstream-source
           submodules: recursive
+          persist-credentials: false
+          fetch-depth: 1
 
-      - name: Install dependencies
-        run: brew install ninja llvm libarchive pkg-config go meson
+      - name: Restore missing source without overwriting plugin customizations
+        run: |
+          set -euo pipefail
+          mkdir -p build/diagnostics dist
+          python3 .github/scripts/restore_upstream.py .upstream-source
+          python3 .github/scripts/check_pbxproj.py
 
-      - name: Cache native deps
-        id: cache-deps
-        uses: actions/cache@v4
+      - name: Select compatible Xcode and verify Metal toolchain
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib,subprocess,re,os
+          candidates=list(pathlib.Path('/Applications').glob('Xcode*.app'))
+          def version(p):
+              text=subprocess.check_output(['/usr/libexec/PlistBuddy','-c','Print :CFBundleShortVersionString',str(p/'Contents/Info.plist')],text=True).strip()
+              return tuple(map(int,re.findall(r'\d+',text)))
+          choices=[p for p in candidates if version(p)>=(26,2)]
+          assert choices, 'Xcode 26.2 or newer is required'
+          preferred=[p for p in choices if version(p)==(26,2)]
+          chosen=(preferred or sorted(choices,key=version,reverse=True))[0]
+          subprocess.run(['sudo','xcode-select','-s',str(chosen/'Contents/Developer')],check=True)
+          print('Selected',chosen)
+          PY
+          xcodebuild -version | tee build/diagnostics/xcode-version.txt
+          if ! xcrun --sdk iphoneos metal --version; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+          xcrun --sdk iphoneos metal --version
+
+      - uses: actions/setup-go@v6
         with:
-          path: |
-            deps/ish/build
-            deps/ffmpeg-patch/build
-            deps/rclone-mobile/build
-          key: ${{ runner.os }}-native-deps-${{ hashFiles('deps/build_*.sh') }}
+          go-version: ${{ inputs.go_version || '1.27.4' }}
+          check-latest: false
+          cache: true
+          cache-dependency-path: deps/rclone-mobile/go.sum
 
-      - name: Build native dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
+      - name: Install host build dependencies
         run: |
-          chmod +x deps/build_ish.sh deps/build_ffmpeg.sh deps/build_rclone_ios.sh
-          ./deps/build_ish.sh
-          ./deps/build_ffmpeg.sh
-          ./deps/build_rclone_ios.sh
+          set -euo pipefail
+          brew install ninja llvm lld libarchive pkg-config meson
+          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
+          echo "PKG_CONFIG_PATH=$(brew --prefix libarchive)/lib/pkgconfig" >> "$GITHUB_ENV"
+          go version | tee build/diagnostics/go-version.txt
+          go env GOVERSION GOEXPERIMENT GOTOOLCHAIN | tee build/diagnostics/go-flags.txt
 
-      - name: Build Minis
+      - name: Verify JSON compatibility and build real Rclone XCFramework
         run: |
-          # 注入配置
-          cp src/ios/Configs/ProviderCustomization.xcconfig.example \
-             src/ios/Configs/ProviderCustomization.xcconfig || true
-          
+          set -euo pipefail
+          cd deps/rclone-mobile
+          go mod tidy
+          go list -f '{{.GoFiles}}' github.com/go-json-experiment/json | tee ../../build/diagnostics/json-selected-files.txt
+          if grep -qw alias.go ../../build/diagnostics/json-selected-files.txt; then
+            echo '::error::Incompatible JSONv2 alias selected'
+            exit 1
+          fi
+          cd ../..
+          bash deps/build_rclone_ios.sh
+          git diff -- deps/rclone-mobile/go.mod deps/rclone-mobile/go.sum > build/diagnostics/rclone-lock.diff
+          test -s deps/frameworks/Rclone.xcframework/Info.plist
+
+      - name: Build LAME before FFmpeg (retain MP3 support)
+        run: |
+          set -euo pipefail
+          bash deps/build_lame.sh
+          test -s deps/lame-build/lib/libmp3lame.a
+          bash deps/build_ffmpeg.sh
+          grep -q '^#define CONFIG_LIBMP3LAME 1' deps/ffmpeg-6.1.2/config.h
+          test -s deps/frameworks/FFmpeg.xcframework/Info.plist
+
+      - name: Build actual iSH runtime including ARM64 VDSO
+        run: |
+          set -euo pipefail
+          bash deps/build_ish.sh release
+          for lib in ish ish_emu fakefs ish_aot; do test -s "deps/libs/lib$lib.a"; done
+          python3 - <<'PY'
+          import pathlib
+          p=pathlib.Path('deps/resources/libvdso.so.elf'); b=p.read_bytes()
+          assert b[:4]==b'\x7fELF' and 64<=len(b)<=8192, 'Invalid, empty or oversized VDSO'
+          assert b[4]==2 and b[5]==1 and int.from_bytes(b[18:20],'little')==183, 'Not little-endian ARM64 ELF'
+          PY
+          test -d deps/resources/RootfsPatch.bundle
+
+      - name: Build real Alpine aarch64 fakefs image
+        run: |
+          set -euo pipefail
+          bash deps/prepare_alpine_rootfs.sh 3.21
+          test -s deps/resources/alpine-rootfs/meta.db
+          test -s deps/resources/alpine-rootfs.zip
+          python3 - <<'PY'
+          import zipfile,sqlite3,pathlib
+          root=pathlib.Path('deps/resources/alpine-rootfs')
+          db=sqlite3.connect(f'file:{root}/meta.db?mode=ro',uri=True)
+          assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          with zipfile.ZipFile('deps/resources/alpine-rootfs.zip') as z: assert z.testzip() is None
+          PY
+
+      - name: Prepare documented provider build configuration
+        run: |
+          set -euo pipefail
+          cfg=src/ios/Configs/ProviderCustomization.xcconfig
+          if [ ! -f "$cfg" ]; then cp "$cfg.example" "$cfg"; fi
+          test -s src/ios/MinisApp.swift
+          test -s src/ios/MinisApp-Bridging-Header.h
+
+      - name: Resolve Swift packages
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project src/ios/Minis.xcodeproj -scheme Minis \
+            -configuration "$CONFIGURATION" \
+            -derivedDataPath "$PWD/build/DerivedData" \
+            -clonedSourcePackagesDirPath "$PWD/build/DerivedData/SourcePackages" \
+            2>&1 | tee build/diagnostics/swiftpm.log
+          find src/ios/Minis.xcodeproj -name Package.resolved -exec cp {} build/diagnostics/ \;
+
+      - name: Build complete unsigned iPhoneOS application and extensions
+        run: |
+          set -euo pipefail
           xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
-            -configuration Debug -destination 'generic/platform=iOS' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+            -configuration "$CONFIGURATION" -sdk iphoneos \
+            -destination 'generic/platform=iOS' -arch arm64 \
+            -derivedDataPath "$PWD/build/DerivedData" \
+            -clonedSourcePackagesDirPath "$PWD/build/DerivedData/SourcePackages" \
+            -resultBundlePath "$PWD/build/diagnostics/Minis.xcresult" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= build \
+            2>&1 | tee build/diagnostics/xcodebuild.log
+
+      - name: Validate application and package explicitly unsigned IPA
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/package_unsigned.py
+
+      - name: Upload unsigned IPA for subsequent user-controlled signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minis-unsigned-${{ github.run_id }}
+          path: |
+            dist/Minis-unsigned.ipa
+            dist/SHA256SUMS
+            dist/build-info.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minis-build-diagnostics-${{ github.run_id }}
+          path: build/diagnostics/
+          if-no-files-found: warn
+          retention-days: 7
