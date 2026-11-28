@@ -432,20 +432,6 @@ extension AIChatViewModel {
 
         do {
         switch tu.name {
-        case "device_bridge":
-            guard Set(toolArgs.keys).isSubset(of: ["tool_title", "capability_id", "args_json"]),
-                  let capability = toolArgs["capability_id"] as? String,
-                  !capability.isEmpty,
-                  let arguments = toolArgs["args_json"] as? String else {
-                toolOutput = "Error: device_bridge requires exact capability_id and args_json strings; confirmation flags are not accepted."
-                toolSuccess = false
-                break
-            }
-            toolOutput = try await DeviceBridgeStore.shared.invoke(
-                capability: capability, argumentsJSON: arguments
-            )
-            toolSuccess = true
-
         case "shell_execute":
             let (command, timeout, delay) = parseToolInput(from: argsJson)
 

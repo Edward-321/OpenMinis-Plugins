@@ -100,11 +100,6 @@ struct SettingsSheet: View {
                     } label: {
                         Label("自动压缩", systemImage: "arrow.down.right.and.arrow.up.left")
                     }
-                    NavigationLink {
-                        DeveloperToolsSettingsView()
-                    } label: {
-                        Label("开发者与设备能力", systemImage: "hammer.fill")
-                    }
                     // [T-tools-granular-switches] First row: per-tool switches.
                     NavigationLink {
                         ToolsSettingsView()
