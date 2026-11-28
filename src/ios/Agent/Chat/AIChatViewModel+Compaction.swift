@@ -460,6 +460,43 @@ extension AIChatViewModel {
         checkContextBeforeSend() != .ok
     }
 
+    // MARK: - Assistant-turn auto-compaction
+
+    /// Count the same post-summary/warm-up/trim/filter history sent to the
+    /// provider, not the lifetime DB history or merged UI bubbles.
+    func autoCompactTurnSnapshot() -> AutoCompactTurnPolicy.Snapshot? {
+        guard let sessionId else { return nil }
+        let count = AutoCompactTurnPolicy.assistantTurnCount(in: effectiveAgentHistory()) {
+            $0.role == .assistant
+        }
+        return .init(sessionID: sessionId, markerID: cachedLatestMarker?.id,
+                     assistantTurns: count)
+    }
+
+    func needsTurnAutoCompact() -> Bool {
+        let settings = AutoCompactTurnPolicy.settings()
+        guard settings.enabled, !isCompacting, let snapshot = autoCompactTurnSnapshot() else { return false }
+        return autoCompactTurnGate.shouldAttempt(settings: settings, snapshot: snapshot)
+    }
+
+    /// Claim BEFORE awaiting the compactor, including its early/no-op exits.
+    /// A failed compact-and-send can drain normally without instantly trying
+    /// the same turn-count compaction again at the loop's first boundary.
+    func noteTurnAutoCompactAttempt() {
+        let settings = AutoCompactTurnPolicy.settings()
+        guard settings.enabled, let snapshot = autoCompactTurnSnapshot() else { return }
+        autoCompactTurnGate.recordAttempt(settings: settings, snapshot: snapshot)
+    }
+
+    /// All successful compactions (manual, capacity, turns) rebase the gate.
+    /// Some tool-heavy warm-up tails still exceed a low threshold; they must
+    /// earn another threshold of effective entries, not compact every request.
+    func rebaseTurnAutoCompactAfterSuccess() {
+        let settings = AutoCompactTurnPolicy.settings()
+        guard settings.enabled, let snapshot = autoCompactTurnSnapshot() else { return }
+        autoCompactTurnGate.recordSuccess(settings: settings, snapshot: snapshot)
+    }
+
     /// The transient status rows a compaction attempt leaves behind
     /// ("Compacting conversation…", "Compaction failed: …", "Compaction
     /// cancelled.").
@@ -483,7 +520,7 @@ extension AIChatViewModel {
     }
 
     /// Compact then send the pending message.
-    func compactAndSend() {
+    func compactAndSend(requireSuccess: Bool = false) {
         showCompactBeforeSendPrompt = false
         let text = pendingSendText ?? ""
         let atts = pendingSendAttachments
@@ -533,7 +570,11 @@ extension AIChatViewModel {
 
         let target = lastActive
         startCompactTask(origin: .beforeSend) { [self] in
+            let markerBefore = cachedLatestMarker?.id
             await compactBefore(target.id)
+            // Automatic round-limit protection must not send an unchanged
+            // history after failure. Keep the visible, cancellable queue intact.
+            if requireSuccess && cachedLatestMarker?.id == markerBefore { return }
             // Drain the queued prompt(s) through the SAME path normal
             // streaming uses (drainQueuedPrompts clears `isQueued` on every
             // matching placeholder and runs the agent loop) — see
@@ -1481,6 +1522,7 @@ extension AIChatViewModel {
         // injection points, and schedulePostCompactDrain would overwrite
         // `currentTask` (the loop's task handle — Stop would then cancel the
         // drain instead of the loop) and run a second loop concurrently.
+        rebaseTurnAutoCompactAfterSuccess()
         if !wasProcessingOnEntry {
             schedulePostCompactDrain()
         }

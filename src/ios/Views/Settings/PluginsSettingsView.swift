@@ -22,6 +22,16 @@ struct PluginsSettingsView: View {
 
     var body: some View {
         List {
+            Section("DSH 兼容") {
+                NavigationLink {
+                    DSHPromptImportView()
+                } label: {
+                    Label("导入 DSH 提示词与卡片", systemImage: "square.and.arrow.down")
+                }
+                Text("当前仅支持提示词数据兼容。DSH 代码插件的工具、Hook 与 Web UI 需要运行时适配，不会静默丢弃后声称兼容。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             if store.plugins.isEmpty {
                 emptyState
             } else {

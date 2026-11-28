@@ -115,6 +115,19 @@ extension AIChatViewModel {
             // trim is neither compacted nor asked about. A tier that can never
             // compact (window under 64K) may collapse at once.
             replanTrim(site: "pre-send", allowCollapse: !contextPolicyAllowsAutoCompact())
+            // Read the shared setting at send time: an already-open chat must
+            // observe changes made in the normal Settings screen.
+            autoCompactEnabled = UserDefaults.standard.bool(forKey: AutoCompactTurnPolicy.capacityEnabledKey)
+            if needsTurnAutoCompact() {
+                noteTurnAutoCompactAttempt()
+                pendingSendText = text
+                pendingSendAttachments = pendingAttachments
+                pendingSendIsFromComposer = usingComposer
+                if usingComposer { inputText = "" }
+                attachments = []
+                compactAndSend(requireSuccess: true)
+                return
+            }
             switch checkContextBeforeSend() {
             case .ok:
                 break

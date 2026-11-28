@@ -168,10 +168,12 @@ final class PluginStore: ObservableObject {
     }
 
     private func readManifest(in dir: URL) -> PluginManifest? {
-        let url = dir.appendingPathComponent(manifestName)
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = try? PluginPackageIO.checkedFile(manifestName, in: dir, limit: 64 * 1024) else { return nil }
         do {
-            return try JSONDecoder().decode(PluginManifest.self, from: data)
+            let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
+            try validate(manifest)
+            guard dir.lastPathComponent == manifest.id else { return nil }
+            return manifest
         } catch {
             AppLogger(category: "PluginStore")
                 .info("[Load] \(dir.lastPathComponent): bad manifest — \(error.localizedDescription)")
@@ -254,7 +256,10 @@ final class PluginStore: ObservableObject {
     /// The folder must contain plugin.json at its top level.
     @discardableResult
     func install(fromDirectory source: URL) throws -> InstalledPlugin {
-        guard let data = try? Data(contentsOf: source.appendingPathComponent(manifestName)) else {
+        guard let data = try? PluginPackageIO.checkedFile(manifestName, in: source, limit: 64 * 1024) else {
+            if fm.fileExists(atPath: source.appendingPathComponent("package.json").path) {
+                throw PluginError.invalidManifest("requires_runtime: 这是 DSH/npm 代码插件，不是 Minis 提示词包。Cordis/JS/UI/Tools 运行时尚未适配；不会执行或假装安装成功。prompt-custom.json 可单独导入为数据。")
+            }
             throw PluginError.missingManifest
         }
         let manifest: PluginManifest
@@ -265,19 +270,34 @@ final class PluginStore: ObservableObject {
         }
         try validate(manifest)
 
+        // Validate/read everything before touching an installed version.
+        let prompts = try PluginPackageIO.promptFiles(manifest: manifest, root: source)
         let root = Self.pluginsRootDir
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         let destination = root.appendingPathComponent(manifest.id, isDirectory: true)
-
-        // Keep the user's selection across a reinstall; a package update must
-        // not silently re-enable modules they turned off.
+        let staged = root.appendingPathComponent(".stage-" + UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: staged, withIntermediateDirectories: false)
+        defer { try? fm.removeItem(at: staged) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(manifest).write(to: staged.appendingPathComponent(manifestName), options: .atomic)
+        for (file, bytes) in prompts {
+            let target = staged.appendingPathComponent(file)
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try bytes.write(to: target, options: .atomic)
+        }
         let previousState = readStates()[manifest.id]
         if fm.fileExists(atPath: destination.path) {
-            try fm.removeItem(at: destination)
+            let attrs = try fm.attributesOfItem(atPath: destination.path)
+            guard attrs[.type] as? FileAttributeType == .typeDirectory else {
+                throw PluginError.invalidManifest("destination is not a real plugin directory")
+            }
+            _ = try fm.replaceItemAt(destination, withItemAt: staged)
+        } else {
+            try fm.moveItem(at: staged, to: destination)
         }
-        try fm.copyItem(at: source, to: destination)
-
-        let state = previousState ?? PluginState(enabled: true, activeModules: nil)
+        // Import never grants prompt permissions, including an update.
+        let state = PluginState(enabled: false, activeModules: previousState?.activeModules)
         var states = readStates()
         states[manifest.id] = state
         writeStates(states)
@@ -288,6 +308,20 @@ final class PluginStore: ObservableObject {
             directoryURL: destination,
             state: state
         )
+    }
+
+    @discardableResult
+    func installDSHPrompt(_ conversion: DSHPromptImporter.Conversion) throws -> InstalledPlugin {
+        let temporary = fm.temporaryDirectory.appendingPathComponent("dsh-import-" + UUID().uuidString)
+        try fm.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: temporary) }
+        try JSONEncoder().encode(conversion.manifest).write(to: temporary.appendingPathComponent("plugin.json"), options: .atomic)
+        for (file, text) in conversion.files {
+            let target = temporary.appendingPathComponent(file)
+            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try text.write(to: target, atomically: true, encoding: .utf8)
+        }
+        return try install(fromDirectory: temporary)
     }
 
     func uninstall(_ pluginId: String) {
@@ -313,6 +347,11 @@ final class PluginStore: ObservableObject {
         }
         var seen = Set<String>()
         for module in manifest.modules {
+            guard module.id.range(of: pattern, options: .regularExpression) != nil,
+                  !module.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  module.file.hasPrefix("prompts/"), module.file.hasSuffix(".md") else {
+                throw PluginError.invalidManifest("invalid prompt module metadata")
+            }
             guard seen.insert(module.id).inserted else {
                 throw PluginError.invalidManifest("duplicate module id: \(module.id)")
             }
@@ -341,8 +380,8 @@ final class PluginStore: ObservableObject {
             var pluginUsed = 0
 
             for module in modules {
-                let url = plugin.directoryURL.appendingPathComponent(module.file)
-                guard let raw = try? String(contentsOf: url, encoding: .utf8) else {
+                guard let bytes = try? PluginPackageIO.checkedFile(module.file, in: plugin.directoryURL, limit: 128 * 1024),
+                      let raw = String(data: bytes, encoding: .utf8) else {
                     AppLogger(category: "PluginStore")
                         .info("[Prompt] \(plugin.id): missing \(module.file)")
                     continue

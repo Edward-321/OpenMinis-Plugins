@@ -1280,18 +1280,18 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     @Published var isCompacting = false
     /// When true, shows a prompt asking user to compact before sending.
     @Published var showCompactBeforeSendPrompt = false
-    /// [T-chat-auto-compact-opt-in] Global (cross-session) opt-in: when the
-    /// context-capacity threshold fires, compact automatically instead of
-    /// prompting — the same no-UI path shortcut sessions already use. Set
-    /// from the confirm dialog's "Compact & Enable Auto-Compact" button or
-    /// the "..." menu's Auto Compact toggle; persisted in UserDefaults so
-    /// future conversations inherit it.
-    @Published var autoCompactEnabled: Bool = UserDefaults.standard.bool(forKey: "autoCompactOnThreshold") {
+    /// [T-chat-auto-compact-opt-in] Global (cross-session) capacity opt-in.
+    /// Shared with AutoCompactSettingsView and the one-time confirm button;
+    /// the independent assistant-turn setting never opts into this policy.
+    @Published var autoCompactEnabled: Bool = UserDefaults.standard.bool(forKey: AutoCompactTurnPolicy.capacityEnabledKey) {
         didSet {
             guard autoCompactEnabled != oldValue else { return }
-            UserDefaults.standard.set(autoCompactEnabled, forKey: "autoCompactOnThreshold")
+            UserDefaults.standard.set(autoCompactEnabled, forKey: AutoCompactTurnPolicy.capacityEnabledKey)
         }
     }
+    /// Shared across send/queue-drain/loop boundaries so a failed turn-count
+    /// compaction cannot immediately repeat on the same effective history.
+    var autoCompactTurnGate = AutoCompactTurnPolicy.Gate()
     /// When true, shows a prompt telling user to start a new session or clear chat.
     @Published var showContextExhaustedPrompt = false
     /// Message text held back while the compact-before-send prompt is shown.

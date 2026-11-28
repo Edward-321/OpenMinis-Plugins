@@ -537,6 +537,11 @@
 		E5VMSPL012B /* AIChatViewModel+DebugDumps.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL012R /* AIChatViewModel+DebugDumps.swift */; };
 		E5VMSPL013B /* AIChatViewModel+TurnCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL013R /* AIChatViewModel+TurnCompletion.swift */; };
 		E5VMSPL014B /* AIChatViewModel+AgentLoop.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL014R /* AIChatViewModel+AgentLoop.swift */; };
+		A0C010000000000000000001 /* AutoCompactTurnPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C020000000000000000001 /* AutoCompactTurnPolicy.swift */; };
+		A0C010000000000000000002 /* DSHPromptImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C020000000000000000002 /* DSHPromptImporter.swift */; };
+		A0C010000000000000000003 /* PluginPackageIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C020000000000000000003 /* PluginPackageIO.swift */; };
+		A0C010000000000000000004 /* AutoCompactSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C020000000000000000004 /* AutoCompactSettingsView.swift */; };
+		A0C010000000000000000005 /* DSHPromptImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C020000000000000000005 /* DSHPromptImportView.swift */; };
 		E5VMSPL015B /* AIChatViewModel+ThinkingLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL015R /* AIChatViewModel+ThinkingLevel.swift */; };
 		E5VMSPL016B /* LLMProviderError.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VMSPL016R /* LLMProviderError.swift */; };
 		E5W000001 /* PortableRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5W000011 /* PortableRecord.swift */; };
@@ -1418,6 +1423,11 @@
 		F1MCPSTORE /* MCPStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPStore.swift; sourceTree = "<group>"; };
 		F1VPLUGF01 /* PluginStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginStore.swift; sourceTree = "<group>"; };
 		F1VPLUGF02 /* PluginsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginsSettingsView.swift; sourceTree = "<group>"; };
+		A0C020000000000000000001 /* AutoCompactTurnPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoCompactTurnPolicy.swift; sourceTree = "<group>"; };
+		A0C020000000000000000002 /* DSHPromptImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSHPromptImporter.swift; sourceTree = "<group>"; };
+		A0C020000000000000000003 /* PluginPackageIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginPackageIO.swift; sourceTree = "<group>"; };
+		A0C020000000000000000004 /* AutoCompactSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoCompactSettingsView.swift; sourceTree = "<group>"; };
+		A0C020000000000000000005 /* DSHPromptImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSHPromptImportView.swift; sourceTree = "<group>"; };
 		F1S00011 /* ChatSessionIdEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionIdEnvironment.swift; sourceTree = "<group>"; };
 		F1T00010 /* ToolLiveSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolLiveSheet.swift; sourceTree = "<group>"; };
 		F1VMCP01 /* MCPIntegrationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPIntegrationsView.swift; sourceTree = "<group>"; };
@@ -2360,6 +2370,7 @@
 				E5VMSPL012R /* AIChatViewModel+DebugDumps.swift */,
 				E5VMSPL013R /* AIChatViewModel+TurnCompletion.swift */,
 				E5VMSPL014R /* AIChatViewModel+AgentLoop.swift */,
+				A0C020000000000000000001 /* AutoCompactTurnPolicy.swift */,
 				E5VMSPL015R /* AIChatViewModel+ThinkingLevel.swift */,
 				E5VMSPL016R /* LLMProviderError.swift */,
 				E5PPR0011 /* AIChatViewModel+ProgrammaticPrompt.swift */,
@@ -2464,6 +2475,8 @@
 				E5N0000112F3B941A00049557 /* SkillStore.swift */,
 				F1MCPSTORE /* MCPStore.swift */,
 				F1VPLUGF01 /* PluginStore.swift */,
+				A0C020000000000000000002 /* DSHPromptImporter.swift */,
+				A0C020000000000000000003 /* PluginPackageIO.swift */,
 				F1MCPOAUTH /* MCPOAuthController.swift */,
 				F1MCPDCR /* MCPOAuthDiscovery.swift */,
 				F1CPMODELS /* CopilotModelsAPI.swift */,
@@ -2600,6 +2613,8 @@
 			children = (
 				AA0838A12F3B941A00049557 /* AboutView.swift */,
 				F1VPLUGF02 /* PluginsSettingsView.swift */,
+				A0C020000000000000000004 /* AutoCompactSettingsView.swift */,
+				A0C020000000000000000005 /* DSHPromptImportView.swift */,
 				E5S000014 /* CloudSyncSettingsView.swift */,
 				E5G000013 /* EnhancedBackgroundSettingsView.swift */,
 				E5P000012 /* EnvironmentVariablesView.swift */,
@@ -3184,6 +3199,7 @@
 				E5VMSPL012B /* AIChatViewModel+DebugDumps.swift in Sources */,
 				E5VMSPL013B /* AIChatViewModel+TurnCompletion.swift in Sources */,
 				E5VMSPL014B /* AIChatViewModel+AgentLoop.swift in Sources */,
+				A0C010000000000000000001 /* AutoCompactTurnPolicy.swift in Sources */,
 				E5VMSPL015B /* AIChatViewModel+ThinkingLevel.swift in Sources */,
 				E5VMSPL016B /* LLMProviderError.swift in Sources */,
 				E5PPR0001 /* AIChatViewModel+ProgrammaticPrompt.swift in Sources */,
@@ -3486,6 +3502,8 @@
 				E5N0000012F3B941A00049557 /* SkillStore.swift in Sources */,
 				F1MCPSTOREB /* MCPStore.swift in Sources */,
 				F1VPLUGB01 /* PluginStore.swift in Sources */,
+				A0C010000000000000000002 /* DSHPromptImporter.swift in Sources */,
+				A0C010000000000000000003 /* PluginPackageIO.swift in Sources */,
 				F1MCPOAUTHB /* MCPOAuthController.swift in Sources */,
 				F1MCPDCRB /* MCPOAuthDiscovery.swift in Sources */,
 				F1CPMODELSB /* CopilotModelsAPI.swift in Sources */,
@@ -3495,6 +3513,8 @@
 				E5N0000022F3B941A00049557 /* SessionSkillsView.swift in Sources */,
 				E5N0000032F3B941A00049557 /* SkillsManagementView.swift in Sources */,
 				F1VPLUGB02 /* PluginsSettingsView.swift in Sources */,
+				A0C010000000000000000004 /* AutoCompactSettingsView.swift in Sources */,
+				A0C010000000000000000005 /* DSHPromptImportView.swift in Sources */,
 				F1VMCPB1 /* MCPIntegrationsView.swift in Sources */,
 				F1VMCPB2 /* MCPFormSheet.swift in Sources */,
 				F1VMCPB3 /* MCPJSONImportSheet.swift in Sources */,

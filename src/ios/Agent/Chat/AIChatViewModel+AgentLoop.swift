@@ -713,10 +713,14 @@ extension AIChatViewModel {
             // Collapsing whole iterations waits until a model summary had its
             // chance, unless none is available here. Only when the trimmed
             // request is still over the line does the switch below compact.
-            let inLoopCompactAvailable = contextPolicyAllowsAutoCompact()
+            let turnPolicyEnabled = AutoCompactTurnPolicy.settings().enabled
+            let inLoopCompactAvailable = (contextPolicyAllowsAutoCompact() || turnPolicyEnabled)
                 && compactionsThisLoop < Self.maxInLoopCompactions && !lastInLoopCompactionMadeNoProgress
             replanTrim(site: "in-loop", allowCollapse: !inLoopCompactAvailable)
             var inLoopVerdict = checkContextBeforeSend(site: "in-loop")
+            let turnCompactDue = inLoopCompactAvailable && needsTurnAutoCompact()
+            let compactForTurns = turnCompactDue && inLoopVerdict == .ok
+            if compactForTurns { inLoopVerdict = .needsCompact }
             // [T-ctx-trim-escalate] The ladder without collapse has little left
             // to give: go to the next level now (collapse-first or a summary)
             // instead of re-planning every few requests just under the line.
@@ -749,7 +753,7 @@ extension AIChatViewModel {
                     // could not pay for its model call (one long user turn is
                     // itself the slice a compaction keeps); compact only if
                     // that is not enough.
-                    if summaryWouldFreeLittle(measured: measureOutboundContextTokens()) {
+                    if !compactForTurns && summaryWouldFreeLittle(measured: measureOutboundContextTokens()) {
                         trimReplanPending = true
                         replanTrim(site: "collapse-first", allowCollapse: true)
                         if checkContextBeforeSend(site: "collapse-first") == .ok {
@@ -761,7 +765,19 @@ extension AIChatViewModel {
                     let sizeBefore = measureOutboundContextTokens()
                     logger.info("[Context] In-loop near capacity — auto-compacting (\(compactionsThisLoop)/\(Self.maxInLoopCompactions)) turnCount=\(turnCount) measured=\(sizeBefore)")
                     let markerBefore = cachedLatestMarker?.id
+                    let turnsBefore = autoCompactTurnSnapshot()?.assistantTurns ?? 0
+                    if turnCompactDue { noteTurnAutoCompactAttempt() }
                     await compactBefore(anchorId, allowDuringProcessing: true)
+                    guard !Task.isCancelled else {
+                        hitTurnLimit = false
+                        break loopLabel
+                    }
+                    if compactForTurns && cachedLatestMarker?.id == markerBefore {
+                        appendSystemInfo("按轮数自动压缩失败，任务已暂停。原历史保留，可手动压缩后继续。", icon: "exclamationmark.triangle")
+                        canResume = true
+                        hitTurnLimit = false
+                        break loopLabel
+                    }
                     // [T-ctx-trim-ladder] Bring what the summary kept down to
                     // the target; with no summary (the compaction failed)
                     // collapse is the only thing left, so it is allowed too.
@@ -769,7 +785,10 @@ extension AIChatViewModel {
                     replanTrim(site: cachedLatestMarker?.id == markerBefore ? "compact-failed" : "after-compact",
                                allowCollapse: true)
                     let sizeAfter = measureOutboundContextTokens()
-                    lastInLoopCompactionMadeNoProgress = sizeAfter >= sizeBefore
+                    let turnsAfter = autoCompactTurnSnapshot()?.assistantTurns ?? 0
+                    lastInLoopCompactionMadeNoProgress = compactForTurns
+                        ? turnsAfter >= turnsBefore
+                        : sizeAfter >= sizeBefore
                     logger.info("[Context] In-loop compact result: measured \(sizeBefore) → \(sizeAfter)\(lastInLoopCompactionMadeNoProgress ? " (no progress — will not retry)" : "")")
 
                     // [T-ios-inloop-compact-divider-order] GH#235. Seal the

@@ -253,6 +253,22 @@ extension AIChatViewModel {
             tools.append(Self.userAskToolDefinition)
         }
 
+        // Device backends are opt-in. The host validates exact bindings and
+        // tool schemas again at dispatch; model text cannot authorize controls.
+        if DeviceBridgeStore.shared.enabled {
+            tools.append(AgentToolDefinition(
+                name: "device_bridge",
+                description: "Call an explicitly bound device-backend capability. Backend identity, discovered schema and user grants are enforced by the host. Stateful controls require the native UI and cannot be authorized with model-provided confirmation. An unavailable backend returns an error; this tool never simulates success.",
+                parameters: [
+                    "tool_title": AgentToolParam(type: .string, description: "A concise summary in the user's language."),
+                    "capability_id": AgentToolParam(type: .string, description: "Exact capability ID configured in Developer Tools. Do not infer a tool binding."),
+                    "args_json": AgentToolParam(type: .string, description: "JSON object matching the discovered tool input schema. No shell interpolation or automatic coercion.")
+                ],
+                required: ["tool_title", "capability_id", "args_json"],
+                propertyOrdering: ["tool_title", "capability_id", "args_json"]
+            ))
+        }
+
         return tools
     }
 

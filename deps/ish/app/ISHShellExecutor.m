@@ -14,6 +14,7 @@
 #include "kernel/task.h"
 #include "fs/devices.h"
 #include "fs/real.h"
+#include <poll.h>
 
 #pragma mark - Result Implementation
 
@@ -377,6 +378,7 @@ static dispatch_once_t _onceToken;
     char buffer[4096];
     NSMutableString *lineBuffer = [NSMutableString string];
     NSMutableString *outputBuffer = isStdErr ? ctx.stderrBuffer : ctx.stdoutBuffer;
+    struct pollfd pipeEvent = { .fd = fd, .events = POLLIN | POLLHUP, .revents = 0 };
 
     while (!ctx.isCompleted) {
         ssize_t bytesRead = read(fd, buffer, sizeof(buffer) - 1);
@@ -407,7 +409,14 @@ static dispatch_once_t _onceToken;
         } else {
             // Error or would block
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                usleep(10000); // 10ms
+                // Wait for readiness instead of waking every 10 ms; output
+                // still wakes the reader immediately, while idle streams use
+                // fewer CPU wakeups. The timeout bounds shutdown observation.
+                int pollResult;
+                do {
+                    pollResult = poll(&pipeEvent, 1, 50);
+                } while (pollResult < 0 && errno == EINTR && !ctx.isCompleted);
+                if (pollResult < 0 && errno != EINTR) break;
                 continue;
             } else {
                 break;
@@ -434,6 +443,7 @@ static dispatch_once_t _onceToken;
         outputBuffer:(NSMutableString *)outputBuffer
             isStdErr:(BOOL)isStdErr {
 
+    NSMutableArray<NSString *> *completedLines = [NSMutableArray array];
     while (YES) {
         NSRange newlineRange = [lineBuffer rangeOfString:@"\n"];
         if (newlineRange.location == NSNotFound) {
@@ -446,19 +456,24 @@ static dispatch_once_t _onceToken;
         // Remove processed line from buffer
         [lineBuffer deleteCharactersInRange:NSMakeRange(0, newlineRange.location + 1)];
 
-        // Add to output buffer
-        @synchronized(outputBuffer) {
-            [outputBuffer appendString:line];
-            [outputBuffer appendString:@"\n"];
-        }
-
-        // Call line callback
-        if (ctx.lineCallback) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                ctx.lineCallback(line, isStdErr);
-            });
-        }
+        [completedLines addObject:line];
     }
+
+    if (completedLines.count == 0) return;
+
+    NSString *joinedOutput = [[completedLines componentsJoinedByString:@"\n"] stringByAppendingString:@"\n"];
+    @synchronized(outputBuffer) {
+        [outputBuffer appendString:joinedOutput];
+    }
+
+    ISHShellLineCallback callback = ctx.lineCallback;
+    if (!callback) return;
+    NSArray<NSString *> *batch = [completedLines copy];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (NSString *line in batch) {
+            callback(line, isStdErr);
+        }
+    });
 }
 
 @end

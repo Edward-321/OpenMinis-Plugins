@@ -13,7 +13,12 @@ from pathlib import Path
 PBX = Path("src/ios/Minis.xcodeproj/project.pbxproj")
 # Files this change is responsible for; each must appear in exactly one
 # PBXBuildFile, one PBXFileReference, one group and one Sources entry.
-REQUIRED = ["PluginStore.swift", "PluginsSettingsView.swift", "MCPStore.swift", "SkillsManagementView.swift", "AboutView.swift"]
+REQUIRED = [
+    "PluginStore.swift", "PluginsSettingsView.swift", "MCPStore.swift",
+    "SkillsManagementView.swift", "AboutView.swift",
+    "AutoCompactTurnPolicy.swift", "DSHPromptImporter.swift", "PluginPackageIO.swift",
+    "AutoCompactSettingsView.swift", "DSHPromptImportView.swift",
+]
 
 
 def main() -> int:
